@@ -1,5 +1,3 @@
-// app/api/auth/[...nextauth]/route.ts
-
 import NextAuth, { type NextAuthOptions } from "next-auth";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -28,7 +26,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials): Promise<Omit<User, "password"> | null> {
+      async authorize(credentials): Promise<{ id: string; name: string | null; email: string } | null> {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Missing email or password");
         }
@@ -41,9 +39,13 @@ export const authOptions: NextAuthOptions = {
         const valid = await bcrypt.compare(credentials.password, user.password);
         if (!valid) throw new Error("Invalid password");
 
-        const { password, ...safeUser } = user;
-        return safeUser;
-      },
+        return {
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
+        };
+      }
+
     }),
   ],
 
@@ -53,12 +55,12 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user }) {
-      if (user && "id" in user) token.id = (user as { id: string | number }).id;
+      if (user) token.id = (user as { id: string }).id;
       return token;
     },
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string;
+      if (token && session.user) {
+        (session.user as { id?: string }).id = token.id as string;
       }
       return session;
     },
